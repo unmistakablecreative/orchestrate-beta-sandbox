@@ -16,7 +16,8 @@ def resolve_collection_alias(collection_input):
         return collection_input
 
     # Not a UUID, resolve from aliases file
-    aliases_path = '/Users/srinivas/Orchestrate Github/orchestrate-beta-sandbox/data/collection_aliases.json'
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    aliases_path = os.path.join(BASE_DIR, 'data', 'collection_aliases.json')
 
     if not os.path.exists(aliases_path):
         # If aliases file doesn't exist, return input as-is (fallback)
@@ -295,7 +296,8 @@ def create_collection(name, description, permission, icon, color, sharing):
     collection_id = response_data.get('data', {}).get('id')
 
     if collection_id:
-        aliases_path = '/Users/srinivas/Orchestrate Github/orchestrate-beta-sandbox/data/collection_aliases.json'
+        BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        aliases_path = os.path.join(BASE_DIR, 'data', 'collection_aliases.json')
 
         # Read existing aliases (or create empty dict if not exists)
         try:
