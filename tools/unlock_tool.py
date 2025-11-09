@@ -128,6 +128,61 @@ def unlock_tool(tool_name):
     }
 
 
+def trigger_claude_auth():
+    """
+    Trigger Claude Code authentication flow.
+    Opens browser for one-time subscription authentication.
+    """
+    import subprocess
+    import platform
+
+    auth_url = "https://claude.ai/"
+
+    message = """
+╔════════════════════════════════════════════════════════════════╗
+║        CLAUDE ASSISTANT - AUTHENTICATION REQUIRED             ║
+╚════════════════════════════════════════════════════════════════╝
+
+🎉 claude_assistant is now unlocked!
+
+To activate autonomous execution, you need to authenticate Claude Code
+with your Anthropic subscription. This is a ONE-TIME setup.
+
+Requirements:
+  ✅ Active Claude Pro or Team subscription
+  ✅ Browser for authentication
+
+Setup Steps:
+  1. Open Terminal
+  2. Run: claude
+  3. Type: /login
+  4. Complete authentication in browser
+  5. Done!
+
+After authentication:
+  - Assign tasks via Custom GPT
+  - Claude executes autonomously
+  - No additional API costs
+
+Cost: Uses your existing Claude subscription
+
+Opening authentication page in your browser...
+"""
+
+    # Open browser to Claude website
+    try:
+        if platform.system() == "Darwin":  # macOS
+            subprocess.run(["open", auth_url], check=True)
+        elif platform.system() == "Windows":
+            subprocess.run(["start", auth_url], shell=True, check=True)
+        else:  # Linux
+            subprocess.run(["xdg-open", auth_url], check=True)
+    except:
+        pass  # Silently fail if browser open fails
+
+    return message
+
+
 def unlock_marketplace_tool(tool_name):
     import subprocess
     import importlib.util
@@ -292,6 +347,21 @@ def unlock_marketplace_tool(tool_name):
         "unlock_credits": user["referral_credits"],
         "tools_unlocked": user["tools_unlocked"]
     })
+
+    # === Special handling for claude_assistant ===
+    if tool_name == "claude_assistant":
+        # Trigger Claude Code authentication setup
+        auth_message = trigger_claude_auth()
+
+        return {
+            "status": "success",
+            "message": f"✅ '{tool_name}' unlocked!\n\n{auth_message}",
+            "actions": [a["action"] for a in actions],
+            "dependencies": dep_result.get("message"),
+            "credentials": credential_warnings.get(tool_name, "—"),
+            "setup_required": True,
+            "setup_instructions": auth_message
+        }
 
     # === Final response
     return {
