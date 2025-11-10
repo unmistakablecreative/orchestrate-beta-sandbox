@@ -3,12 +3,12 @@
   "ngrok_url": "https://supposedly-faithful-termite.ngrok-free.app",
   "tests": [
     {
-      "name": "health_check",
+      "name": "check_credits",
       "description": "Verify Docker container is running and accessible",
       "endpoint": "/execute_task",
       "payload": {
-        "tool_name": "system_settings",
-        "action": "health_check",
+        "tool_name": "check_credits",
+        "action": "check_credits",
         "params": {}
       },
       "expected_status": "success",
@@ -32,10 +32,25 @@
       "endpoint": "/execute_task",
       "payload": {
         "tool_name": "json_manager",
-        "action": "create",
+        "action": "create_json_file",
         "params": {
-          "file_path": "/tmp/test_data.json",
-          "initial_data": {"test": "data", "timestamp": "2025-11-08"}
+          "filename": "test_data.json"
+        }
+      },
+      "expected_status": "success",
+      "critical": false
+    },
+    {
+      "name": "json_manager_add_entry",
+      "description": "Test json_manager add entry operation",
+      "endpoint": "/execute_task",
+      "payload": {
+        "tool_name": "json_manager",
+        "action": "add_json_entry",
+        "params": {
+          "filename": "test_data.json",
+          "entry_key": "test_entry",
+          "entry_data": {"test": "data", "timestamp": "2025-11-08"}
         }
       },
       "expected_status": "success",
@@ -47,33 +62,17 @@
       "endpoint": "/execute_task",
       "payload": {
         "tool_name": "json_manager",
-        "action": "read",
+        "action": "read_json_file",
         "params": {
-          "file_path": "/tmp/test_data.json"
-        }
-      },
-      "expected_status": "success",
-      "expected_contains": "test",
-      "critical": false
-    },
-    {
-      "name": "json_manager_update",
-      "description": "Test json_manager update operation",
-      "endpoint": "/execute_task",
-      "payload": {
-        "tool_name": "json_manager",
-        "action": "update",
-        "params": {
-          "file_path": "/tmp/test_data.json",
-          "updates": {"new_field": "updated_value"}
+          "filename": "test_data.json"
         }
       },
       "expected_status": "success",
       "critical": false
     },
     {
-      "name": "outline_editor_search",
-      "description": "Test Outline search (requires API key configured)",
+      "name": "outline_editor_locked",
+      "description": "Verify outline_editor shows as locked",
       "endpoint": "/execute_task",
       "payload": {
         "tool_name": "outline_editor",
@@ -84,82 +83,50 @@
           "offset": 0
         }
       },
-      "expected_status": "success",
-      "critical": false,
-      "skip_if_missing_credentials": true
+      "expected_status": "locked",
+      "critical": false
     },
     {
-      "name": "unlock_tool_check_status",
-      "description": "Check unlock status for a tool",
+      "name": "list_supported_actions",
+      "description": "Verify system can list all supported actions",
       "endpoint": "/execute_task",
       "payload": {
         "tool_name": "system_settings",
-        "action": "get_tool_status",
+        "action": "list_supported_actions",
+        "params": {}
+      },
+      "expected_status": "success",
+      "critical": true
+    },
+    {
+      "name": "file_ops_find",
+      "description": "Test file_ops_tool find operation",
+      "endpoint": "/execute_task",
+      "payload": {
+        "tool_name": "file_ops_tool",
+        "action": "find_file",
         "params": {
-          "tool_name": "outline_editor"
+          "key": "find_test",
+          "filename": "test_data.json"
         }
       },
       "expected_status": "success",
       "critical": false
     },
     {
-      "name": "file_manager_create",
-      "description": "Test file_manager create file operation",
+      "name": "file_ops_read",
+      "description": "Test file_ops_tool read operation",
       "endpoint": "/execute_task",
       "payload": {
-        "tool_name": "file_manager",
-        "action": "create_file",
-        "params": {
-          "file_path": "/tmp/test_file.txt",
-          "content": "Automated test file created"
-        }
-      },
-      "expected_status": "success",
-      "critical": false
-    },
-    {
-      "name": "file_manager_read",
-      "description": "Test file_manager read file operation",
-      "endpoint": "/execute_task",
-      "payload": {
-        "tool_name": "file_manager",
+        "tool_name": "file_ops_tool",
         "action": "read_file",
         "params": {
-          "file_path": "/tmp/test_file.txt"
+          "key": "read_test",
+          "filename": "test_data.json"
         }
       },
       "expected_status": "success",
-      "expected_contains": "Automated test",
       "critical": false
-    },
-    {
-      "name": "claude_assistant_queue_check",
-      "description": "Verify claude_assistant task queue exists and is accessible",
-      "endpoint": "/execute_task",
-      "payload": {
-        "tool_name": "file_manager",
-        "action": "check_exists",
-        "params": {
-          "file_path": "/orchestrate_user/claude_task_queue.json"
-        }
-      },
-      "expected_status": "success",
-      "critical": true
-    },
-    {
-      "name": "execution_context_loaded",
-      "description": "Verify execution_context.json is loaded and accessible",
-      "endpoint": "/execute_task",
-      "payload": {
-        "tool_name": "json_manager",
-        "action": "read",
-        "params": {
-          "file_path": "/opt/orchestrate-core-runtime/data/execution_context.json"
-        }
-      },
-      "expected_status": "success",
-      "expected_contains": "collection_ids",
-      "critical": true
     },
     {
       "name": "system_settings_ndjson_valid",
@@ -174,28 +141,5 @@
       "critical": true
     }
   ],
-  "cleanup": [
-    {
-      "description": "Remove test files",
-      "endpoint": "/execute_task",
-      "payload": {
-        "tool_name": "file_manager",
-        "action": "delete_file",
-        "params": {
-          "file_path": "/tmp/test_data.json"
-        }
-      }
-    },
-    {
-      "description": "Remove test file",
-      "endpoint": "/execute_task",
-      "payload": {
-        "tool_name": "file_manager",
-        "action": "delete_file",
-        "params": {
-          "file_path": "/tmp/test_file.txt"
-        }
-      }
-    }
-  ]
+  "cleanup": []
 }

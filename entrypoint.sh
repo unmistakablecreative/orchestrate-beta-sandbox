@@ -10,6 +10,10 @@ mkdir -p "$USER_DIR/vault/watch_transcripts"
 mkdir -p "$USER_DIR/orchestrate_exports/markdown"
 mkdir -p "$STATE_DIR"
 
+# Create Claude Code queue files for autonomous execution
+echo '{"tasks": {}}' > "$USER_DIR/claude_task_queue.json"
+echo '{"results": {}}' > "$USER_DIR/claude_task_results.json"
+
 # Prompt if not passed in
 if [ -z "$NGROK_TOKEN" ]; then
   read -p "🔐 Enter your ngrok authtoken: " NGROK_TOKEN

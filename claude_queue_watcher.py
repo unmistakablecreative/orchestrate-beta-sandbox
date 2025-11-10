@@ -21,6 +21,7 @@ import sys
 import time
 import json
 import subprocess
+import threading
 from datetime import datetime
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -71,12 +72,8 @@ class ClaudeQueueHandler(FileSystemEventHandler):
                 queue = json.load(f)
 
             # Find pending tasks not yet processed
-            # Queue structure: {"tasks": {task_id: task_data}}
             pending = []
-            tasks = queue.get("tasks", {})
-            for task_id, task_data in tasks.items():
-                if not isinstance(task_data, dict):
-                    continue  # Skip malformed entries
+            for task_id, task_data in queue.get("tasks", {}).items():
                 status = task_data.get('status', 'queued')
                 if status == 'queued' and task_id not in self.processed_tasks:
                     pending.append((task_id, task_data))
@@ -107,23 +104,28 @@ class ClaudeQueueHandler(FileSystemEventHandler):
             # Update task status to in_progress
             self._update_task_status(task_id, 'in_progress')
 
-            # Spawn Claude Code session with proper prompt
-            prompt = f"{description}\n\nYou can use tools via API at http://localhost:8000/execute_task"
+            # Spawn Claude Code session
+            # Try common Claude install locations
+            claude_path = None
+            for path in ['/opt/homebrew/bin/claude', os.path.expanduser('~/.local/bin/claude'), 'claude']:
+                if path == 'claude' or os.path.exists(path):
+                    claude_path = path
+                    break
+
+            if not claude_path:
+                log("❌ Claude Code not found! Install with: brew install claude-code")
+                return
+
             cmd = [
-                'claude',
-                '-p', prompt,
-                '--permission-mode', 'acceptEdits',
-                '--allowedTools', 'Bash,Read,Write,Edit'
+                claude_path,
+                '-p',
+                '--dangerously-skip-permissions',
+                description
             ]
 
-            # Run in background with subscription auth (no API key)
-            import os
-            env = os.environ.copy()
-            env.pop('ANTHROPIC_API_KEY', None)  # Use subscription auth, not API
-
+            # Run in background
             process = subprocess.Popen(
                 cmd,
-                env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True
@@ -134,8 +136,20 @@ class ClaudeQueueHandler(FileSystemEventHandler):
             # Mark as processed (even if running, don't spawn twice)
             self.processed_tasks.add(task_id)
 
-            # Note: Results will be written by Claude session when complete
-            # We don't wait here - it runs autonomously
+            # Wait for completion in background thread
+            def wait_for_completion():
+                stdout, stderr = process.communicate()
+                exit_code = process.returncode
+                if exit_code == 0:
+                    log(f"✅ Task {task_id} completed successfully")
+                    self._update_task_status(task_id, 'completed')
+                else:
+                    log(f"❌ Task {task_id} failed with exit code {exit_code}")
+                    log(f"   stderr: {stderr[:200]}")
+                    self._update_task_status(task_id, 'error', error=f"Exit code {exit_code}")
+
+            # Start monitoring thread
+            threading.Thread(target=wait_for_completion, daemon=True).start()
 
         except FileNotFoundError:
             log(f"❌ Claude Code not found! Install with: brew install claude-code")
@@ -152,11 +166,9 @@ class ClaudeQueueHandler(FileSystemEventHandler):
             with open(self.queue_file, 'r') as f:
                 queue = json.load(f)
 
-            tasks = queue.get("tasks", {})
-            if task_id in tasks:
-                tasks[task_id]['status'] = status
-                tasks[task_id].update(kwargs)
-                queue["tasks"] = tasks
+            if task_id in queue.get("tasks", {}):
+                queue["tasks"][task_id]['status'] = status
+                queue["tasks"][task_id].update(kwargs)
 
                 with open(self.queue_file, 'w') as f:
                     json.dump(queue, f, indent=2)
@@ -178,12 +190,12 @@ def main():
     # Ensure files exist
     if not os.path.exists(queue_file):
         with open(queue_file, 'w') as f:
-            json.dump({}, f)
+            json.dump({"tasks": {}}, f)
         log("📝 Created empty queue file")
 
     if not os.path.exists(results_file):
         with open(results_file, 'w') as f:
-            json.dump({}, f)
+            json.dump({"results": {}}, f)
         log("📝 Created empty results file")
 
     log("⚡ Claude Code Queue Watcher Started")
